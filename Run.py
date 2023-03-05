@@ -4,13 +4,18 @@ from imutils.video import VideoStream
 from imutils.video import FPS
 from mylib.mailer import Mailer
 from mylib import config, thread
-import time, schedule, csv
+import time, schedule
 import numpy as np
+import cv2
 import argparse, imutils
-import time, dlib, cv2, datetime
+import time, dlib, datetime
 from itertools import zip_longest
 
+import sqlite3
+import random
+
 t0 = time.time()
+
 
 def run():
 
@@ -45,6 +50,7 @@ def run():
 	if not args.get("input", False):
 		print("[INFO] Starting the live stream..")
 		vs = VideoStream(config.url).start()
+		#vs = VideoStream("rtsp://tapo233F:Riouch2000@192.168.1.12:8080").start()
 		time.sleep(2.0)
 
 	# otherwise, grab a reference to the video file
@@ -81,12 +87,16 @@ def run():
 
 	if config.Thread:
 		vs = thread.ThreadingClass(config.url)
+		print("vs = thread")
+		print(frame)
 
 	# loop over frames from the video stream
 	while True:
 		# grab the next frame and handle if we are reading from either
 		# VideoCapture or VideoStream
 		frame = vs.read()
+		#print("frame = vs.read" + frame)
+
 		frame = frame[1] if args.get("input", False) else frame
 
 		# if we are viewing a video and we did not grab a frame then we
@@ -273,7 +283,9 @@ def run():
 		("Total people inside", x),
 		]
 
-                # Display the output
+
+
+              # Display the output
 		for (i, (k, v)) in enumerate(info):
 			text = "{}: {}".format(k, v)
 			cv2.putText(frame, text, (10, H - ((i * 20) + 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
@@ -282,16 +294,6 @@ def run():
 			text = "{}: {}".format(k, v)
 			cv2.putText(frame, text, (265, H - ((i * 20) + 60)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-		# Initiate a simple log to save data at end of the day
-		if config.Log:
-			datetimee = [datetime.datetime.now()]
-			d = [datetimee, empty1, empty, x]
-			export_data = zip_longest(*d, fillvalue = '')
-
-			with open('Log.csv', 'w', newline='') as myfile:
-				wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
-				wr.writerow(("End Time", "In", "Out", "Total Inside"))
-				wr.writerows(export_data)
 				
 		# check to see if we should write the frame to disk
 		if writer is not None:
@@ -300,6 +302,7 @@ def run():
 		# show the output frame
 		cv2.imshow("Real-Time Monitoring/Analysis Window", frame)
 		key = cv2.waitKey(1) & 0xFF
+		
 
 		# if the `q` key was pressed, break from the loop
 		if key == ord("q"):
@@ -337,7 +340,7 @@ def run():
 
 	# close any open windows
 	cv2.destroyAllWindows()
-
+	
 
 ##learn more about different schedules here: https://pypi.org/project/schedule/
 if config.Scheduler:
