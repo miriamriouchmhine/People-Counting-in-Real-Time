@@ -9,13 +9,16 @@ import numpy as np
 import cv2
 import argparse, imutils
 import time, dlib, datetime
+from datetime import datetime
 from itertools import zip_longest
 import threading
-import sqlite3
+import mysql.connector
 
 
 t0 = time.time()
-
+#Declaramos la variable global ocupación anterior al principio del código, 
+global ocu_anterior
+ocu_anterior = -1
 
 def run():
 
@@ -89,51 +92,36 @@ def run():
 		print(frame)
 
 #-------------------------GUARDAR EN BASE DATOS-----------------------------------
-	#Crear conexion a la base de datos( si no existe, se creará automaticamente)
-	conn = sqlite3.connect("C:\\Users\\miria\\OneDrive\\Documentos\\universidad\\4º AÑO\\2ºcuatri\\TFG\\People-Counting\\People-Counting-in-Real-Time\\bbdd\\mydb.db", check_same_thread=False)
+	#Crear conexion a la base de datos
+	conn = mysql.connector.connect(
+		host="localhost",
+		user="root",
+		password="12345678"
+	)
 	#Crear un cursor para ejecutar comandos SQL
 	cur = conn.cursor()
+	#Crear una base de datos llamada base si no existe
+	cur.execute("CREATE DATABASE IF NOT EXISTS mydb")
+	#Usar la base de datos creada
+	cur.execute("USE mydb")
 	#Crear una tabla llamada registros con tres columnas, fecha, hora, ocupacion
-	cur.execute("CREATE TABLE IF NOT EXISTS biblioteca (fecha TEXT, hora TEXT, ocupacion INTEGER)")
+	cur.execute("CREATE TABLE IF NOT EXISTS biblioteca (fecha_hora TEXT, ocupacion INT)")
 	#Guardamos cambios en la base de datos
 	conn.commit()
 
-	# Definir una funcion que inserte un registro cada hora en la tabla
+	# Definir una funcion que inserte la ocupación en la tabla
 	def guardar_x(x):
 		#Obtener la fecha y hora actuales y convertirlas en cadenas de texto
-		fecha = datetime.date.today().strftime("%d/%m/%Y")
-		hora = datetime.datetime.now().strftime("%H:%M:%S")
+		fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+		# hora = datetime.datetime.now().strftime("%H:%M:%S")
 		#Insertar el registro en la tabla con los valores de fecha, hora  y ocupacion
-		cur.execute("INSERT INTO biblioteca (fecha, hora, ocupacion) VALUES (?,?,?)", (fecha, hora, x))
+		cur.execute("INSERT INTO biblioteca (fecha_hora, ocupacion) VALUES (%s,%s)", (fecha_hora, x))
 		#Guardar los cambios en la base de datos
 		conn.commit()
-		
 
 		#comprobacion
-		print(f"Se ha insertadp el registro: {fecha}, {hora}, {x}")
+		print(f"Se ha insertadp el registro: {fecha_hora}, {x}")
 	
-	#--------------------THREAD---------------------------------------------
-	global ocu_global 
-	ocu_global= 0
-
-	#Definir una función que se ejecuta cada hora en un hilo
-	def guardar_datos_cada_hora():
-		#Esperar hasta la proxima hora
-		time.sleep(60 * (60 - datetime.datetime.now().minute))
-		#time.sleep(10)
-		#Ejecutar la funcion cada hora
-		while True:
-			#Acceder a la variable global ocu_global
-			ocu_global
-			#Llamar a la funcion guardar_x() con el valaor ocu_global
-			guardar_x(ocu_global)
-			time.sleep(60 * 60)
-			#time.sleep(10)
-	#Crear y lanzar el hilo
-	hilo = threading.Thread(target=guardar_datos_cada_hora)
-	hilo.start()
-	#--------------------------------------------------------------------
-
 	# loop over frames from the video stream
 	while True:
 		# grab the next frame and handle if we are reading from either
@@ -321,7 +309,15 @@ def run():
 		]
 
 		ocu = totalDown - totalUp
-		ocu_global = ocu
+		
+		#Obtenemos el valor de la variable ocupacion anterior
+		global ocu_anterior
+		# Comparar el valor actual con el anterior, si es diferente guardamos ese valor en la tabla, si no pasamos
+		if ocu !=ocu_anterior:
+			guardar_x(ocu)
+			ocu_anterior = ocu
+		else:
+			pass
 
               # Display the output
 		for (i, (k, v)) in enumerate(info):
